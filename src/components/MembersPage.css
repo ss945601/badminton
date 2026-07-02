@@ -1,0 +1,247 @@
+.members-page {
+  max-width: 1200px;
+  margin: 0 auto;
+}
+
+.members-header {
+  text-align: center;
+  margin-bottom: 3rem;
+}
+
+.members-header h2 {
+  font-size: 2rem;
+  font-weight: 800;
+  color: #0f172a;
+  margin-bottom: 0.5rem;
+}
+
+.members-header p {
+  color: #64748b;
+  font-size: 1.05rem;
+}
+
+.calendar-section {
+  background: white;
+  border-radius: 1.5rem;
+  padding: 2rem;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.06);
+  margin-bottom: 3rem;
+}
+
+.calendar-section h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 0.5rem;
+}
+
+.calendar-hint {
+  color: #64748b;
+  font-size: 0.9rem;
+  margin-bottom: 1.5rem;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
+  gap: 1rem;
+  margin-bottom: 1.5rem;
+}
+
+.calendar-day {
+  background: linear-gradient(135deg, #f8fafc 0%, #e2e8f0 100%);
+  border: 2px solid #e2e8f0;
+  border-radius: 1rem;
+  padding: 1.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+
+.calendar-day.has-players {
+  background: linear-gradient(135deg, #f0fdfa 0%, #ccfbf1 100%);
+  border-color: #5eead4;
+}
+
+.calendar-day:hover {
+  transform: translateY(-4px);
+  box-shadow: 0 8px 20px rgba(15, 118, 110, 0.15);
+}
+
+.calendar-day.active {
+  background: linear-gradient(135deg, #16a34a 0%, #0f766e 100%);
+  border-color: #0f766e;
+  color: white;
+}
+
+.day-label {
+  font-weight: 700;
+  font-size: 0.9rem;
+}
+
+.day-count {
+  font-size: 2rem;
+  font-weight: 800;
+}
+
+.day-text {
+  font-size: 0.8rem;
+  opacity: 0.8;
+}
+
+.day-details {
+  background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%);
+  border-radius: 1rem;
+  padding: 1.5rem;
+  margin-top: 1rem;
+}
+
+.day-details h4 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0f766e;
+  margin-bottom: 1rem;
+}
+
+.players-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.player-tag {
+  background: white;
+  border: 1px solid #99f6e4;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.player-name {
+  font-weight: 600;
+  color: #0f766e;
+}
+
+.player-info {
+  color: #64748b;
+  font-size: 0.85rem;
+}
+
+.copy-notification {
+  background: linear-gradient(135deg, #16a34a, #0f766e);
+  color: white;
+  padding: 0.75rem 1.5rem;
+  border-radius: 999px;
+  text-align: center;
+  font-weight: 600;
+  margin-top: 1rem;
+  animation: slideIn 0.3s ease;
+}
+
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.members-list {
+  margin-top: 3rem;
+}
+
+.members-list > h3 {
+  font-size: 1.5rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin-bottom: 1.5rem;
+}
+
+.members-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+  gap: 1.5rem;
+}
+
+.member-card {
+  background: white;
+  border-radius: 1.25rem;
+  padding: 1.5rem;
+  box-shadow: 0 2px 12px rgba(0, 0, 0, 0.05);
+  display: flex;
+  gap: 1rem;
+  transition: all 0.2s ease;
+}
+
+.member-card:hover {
+  box-shadow: 0 4px 20px rgba(15, 118, 110, 0.15);
+  transform: translateY(-2px);
+}
+
+.member-avatar {
+  width: 60px;
+  height: 60px;
+  background: linear-gradient(135deg, #16a34a, #0f766e);
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: white;
+  font-weight: 800;
+  font-size: 1.5rem;
+  flex-shrink: 0;
+}
+
+.member-info {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+}
+
+.member-info h4 {
+  font-size: 1.2rem;
+  font-weight: 700;
+  color: #0f172a;
+  margin: 0;
+}
+
+.member-id {
+  color: #94a3b8;
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.member-details {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+  color: #64748b;
+}
+
+.loading-state {
+  text-align: center;
+  padding: 4rem 2rem;
+  color: #64748b;
+  font-size: 1.1rem;
+}
+
+@media (max-width: 768px) {
+  .calendar-grid {
+    grid-template-columns: repeat(auto-fit, minmax(100px, 1fr));
+  }
+  
+  .members-grid {
+    grid-template-columns: 1fr;
+  }
+}
