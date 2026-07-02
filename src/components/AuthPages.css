@@ -74,7 +74,14 @@
   margin-top: 0.5rem;
 }
 
-.form-submit-btn:hover {
+.form-submit-btn:disabled {
+  cursor: not-allowed;
+  opacity: 0.65;
+  transform: none;
+  box-shadow: none;
+}
+
+.form-submit-btn:hover:not(:disabled) {
   transform: translateY(-2px);
   box-shadow: 0 8px 20px rgba(15, 118, 110, 0.3);
 }

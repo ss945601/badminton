@@ -22,6 +22,22 @@ export default function MembersPage() {
   const dayLabels = ['週一', '週二', '週三', '週四', '週五', '週六', '週日']
   const dayKeys = ['monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday']
 
+  const getWeekDates = () => {
+    const today = new Date()
+    const day = today.getDay()
+    const mondayOffset = day === 0 ? -6 : 1 - day
+    const monday = new Date(today)
+    monday.setDate(today.getDate() + mondayOffset)
+
+    return dayKeys.map((_, index) => {
+      const date = new Date(monday)
+      date.setDate(monday.getDate() + index)
+      return `${date.getMonth() + 1}/${date.getDate()}`
+    })
+  }
+
+  const weekDates = getWeekDates()
+
   const getMembersForDay = (dayKey) =>
     members.filter((member) => member.availability?.[dayKey])
 
@@ -52,12 +68,12 @@ export default function MembersPage() {
     <div className="members-page">
       <div className="members-header">
         <h2>👥 會員總覽</h2>
-        <p>查看所有會員與每週可打球的時間</p>
+        <p>查看所有會員與本週可打球的時間</p>
       </div>
 
       <div className="calendar-section">
-        <h3>📅 每週打球時間表</h3>
-        <p className="calendar-hint">點擊任一天可複製該日可打球名單</p>
+        <h3>📅 本週打球時間表</h3>
+        <p className="calendar-hint">點擊任一天可複製本週該日可打球名單</p>
         
         <div className="calendar-grid">
           {dayKeys.map((dayKey, index) => {
@@ -73,6 +89,7 @@ export default function MembersPage() {
                 title={`點擊複製 ${dayLabels[index]} 可打球名單`}
               >
                 <span className="day-label">{dayLabels[index]}</span>
+                <span className="day-date">{weekDates[index]}</span>
                 <span className="day-count">{players.length}</span>
                 <span className="day-text">{players.length ? '人可打' : '無人'}</span>
               </button>

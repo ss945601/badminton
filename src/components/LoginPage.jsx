@@ -7,6 +7,7 @@ import './AuthPages.css'
 export default function LoginPage({ token, setToken, setStatus }) {
   const navigate = useNavigate()
   const [form, setForm] = useState({ username: '', id_card_last3: '' })
+  const [loading, setLoading] = useState(false)
 
   useEffect(() => {
     if (token) {
@@ -16,23 +17,31 @@ export default function LoginPage({ token, setToken, setStatus }) {
 
   const handleSubmit = async (event) => {
     event.preventDefault()
+    setLoading(true)
+    setStatus('')
 
-    const response = await fetch(`${API_BASE_URL}/api/login`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(form),
-    })
-    const result = await response.json()
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/login`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(form),
+      })
+      const result = await response.json()
 
-    if (!response.ok) {
-      setStatus(result.detail || '登入失敗')
-      return
+      if (!response.ok) {
+        setStatus(result.detail || '登入失敗')
+        return
+      }
+
+      setStoredToken(result.access_token)
+      setToken(result.access_token)
+      setStatus('登入成功')
+      navigate('/profile')
+    } catch (error) {
+      setStatus('登入時發生錯誤，請稍後再試')
+    } finally {
+      setLoading(false)
     }
-
-    setStoredToken(result.access_token)
-    setToken(result.access_token)
-    setStatus('登入成功')
-    navigate('/profile')
   }
 
   return (
@@ -71,8 +80,8 @@ export default function LoginPage({ token, setToken, setStatus }) {
             />
           </div>
 
-          <button type="submit" className="form-submit-btn">
-            登入
+          <button type="submit" className="form-submit-btn" disabled={loading}>
+            {loading ? '登入中...' : '登入'}
           </button>
         </form>
 
