@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../constants'
 import './AuthPages.css'
 
@@ -113,7 +113,7 @@ export default function RegisterPage({ setStatus }) {
 
         <div className="auth-footer">
           已經是會員了？
-          <a href="/login" className="auth-link">立即登入</a>
+          <Link to="/login" className="auth-link">立即登入</Link>
         </div>
       </div>
     </div>

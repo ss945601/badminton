@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { API_BASE_URL } from '../constants'
 import { setStoredToken } from '../utils/auth'
 import './AuthPages.css'
@@ -87,7 +87,7 @@ export default function LoginPage({ token, setToken, setStatus }) {
 
         <div className="auth-footer">
           還不是會員？
-          <a href="/register" className="auth-link">立即註冊</a>
+          <Link to="/register" className="auth-link">立即註冊</Link>
         </div>
       </div>
     </div>
