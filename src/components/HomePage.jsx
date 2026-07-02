@@ -1,17 +1,11 @@
 import { Link } from 'react-router-dom'
+import homeImage from '../assets/home_img.png'
 import './HomePage.css'
 
 export default function HomePage({ token }) {
   return (
     <div className="home-page">
-      <section className="hero-section">
-        <div className="hero-content">
-          <h2 className="hero-title">歡迎來到 Latticework 羽球社 🏸</h2>
-          <p className="hero-description">
-            加入我們，一起享受羽球帶來的樂趣！管理你的打球時間，認識更多球友，隨時掌握社團動態。
-          </p>
-        </div>
-      </section>
+
 
       <div className="features-grid">
         <div className="feature-card">
@@ -50,6 +44,14 @@ export default function HomePage({ token }) {
           </div>
         </section>
       )}
+            <section className="hero-section">
+        <div className="hero-content">
+          <a href="https://www.youtube.com/@%E5%8F%B0%E5%85%83%E8%8F%9C%E9%9B%9E%E5%9C%98" target="_blank" rel="noopener noreferrer">
+            <img src={homeImage} alt="Latticework 羽球社活動照片" className="hero-image" />
+          </a>
+          <h2 className="hero-title">歡迎來到 Latticework 羽球社 🏸</h2>
+        </div>
+      </section>
     </div>
   )
 }
