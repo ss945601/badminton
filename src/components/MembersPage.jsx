@@ -80,6 +80,7 @@ export default function MembersPage() {
           })}
         </div>
 
+        <div className="day-details-container">
         {activeDay && (
           <div className="day-details">
             <h4>{dayLabels[dayKeys.indexOf(activeDay)]} 可打球名單</h4>
@@ -93,6 +94,7 @@ export default function MembersPage() {
             </div>
           </div>
         )}
+        </div>
 
         {copyState && <div className="copy-notification">{copyState}</div>}
       </div>
