@@ -7,6 +7,23 @@ export default function MembersPage() {
   const [loading, setLoading] = useState(true)
   const [activeDay, setActiveDay] = useState(null)
   const [copyState, setCopyState] = useState('')
+  const [leavesByDate, setLeavesByDate] = useState({})
+
+  const getWeekRange = () => {
+    const today = new Date()
+    const day = today.getDay()
+    const mondayOffset = day === 0 ? -6 : 1 - day
+    const monday = new Date(today)
+    monday.setDate(today.getDate() + mondayOffset)
+    
+    const sunday = new Date(monday)
+    sunday.setDate(monday.getDate() + 6)
+    
+    return {
+      start: monday.toISOString().split('T')[0],
+      end: sunday.toISOString().split('T')[0],
+    }
+  }
 
   useEffect(() => {
     const fetchMembers = async () => {
@@ -16,7 +33,15 @@ export default function MembersPage() {
       setLoading(false)
     }
 
+    const fetchLeaves = async () => {
+      const { start, end } = getWeekRange()
+      const response = await fetch(`${API_BASE_URL}/api/leaves?start_date=${start}&end_date=${end}`)
+      const result = await response.json()
+      setLeavesByDate(result.leaves_by_date || {})
+    }
+
     fetchMembers()
+    fetchLeaves()
   }, [])
 
   const dayLabels = ['週一', '週二', '週三', '週四', '週五', '週六', '週日']
@@ -38,11 +63,43 @@ export default function MembersPage() {
 
   const weekDates = getWeekDates()
 
-  const getMembersForDay = (dayKey) =>
-    members.filter((member) => member.availability?.[dayKey])
+  const getFullWeekDates = () => {
+    const today = new Date()
+    const day = today.getDay()
+    const mondayOffset = day === 0 ? -6 : 1 - day
+    const monday = new Date(today)
+    monday.setDate(today.getDate() + mondayOffset)
 
-  const handleCopy = async (dayKey) => {
-    const players = getMembersForDay(dayKey)
+    return dayKeys.map((_, index) => {
+      const date = new Date(monday)
+      date.setDate(monday.getDate() + index)
+      return date.toISOString().split('T')[0]
+    })
+  }
+
+  const fullWeekDates = getFullWeekDates()
+
+  const getLeavesForDate = (dateStr) => {
+    return leavesByDate[dateStr] || []
+  }
+
+  const getMembersForDay = (dayKey, dayIndex) => {
+    const availableMembers = members.filter((member) => member.availability?.[dayKey])
+    const dateStr = fullWeekDates[dayIndex]
+    const leavesOnDate = getLeavesForDate(dateStr)
+    const leaveIds = leavesOnDate.map(leave => leave.member_id)
+    
+    return availableMembers.filter(member => !leaveIds.includes(member.member_id))
+  }
+
+  const getLeaveCountForDay = (dayIndex) => {
+    const dateStr = fullWeekDates[dayIndex]
+    const leavesOnDate = getLeavesForDate(dateStr)
+    return leavesOnDate.length
+  }
+
+  const handleCopy = async (dayKey, dayIndex) => {
+    const players = getMembersForDay(dayKey, dayIndex)
     const text = players
       .map((member) => `${member.nickname}｜卡號:${member.card_number || '未填'}｜尾碼:${member.id_card_last3}`)
       .join('\n')
@@ -77,7 +134,8 @@ export default function MembersPage() {
         
         <div className="calendar-grid">
           {dayKeys.map((dayKey, index) => {
-            const players = getMembersForDay(dayKey)
+            const players = getMembersForDay(dayKey, index)
+            const leaveCount = getLeaveCountForDay(index)
             return (
               <button
                 key={dayKey}
@@ -85,13 +143,14 @@ export default function MembersPage() {
                 className={`calendar-day ${players.length ? 'has-players' : ''} ${activeDay === dayKey ? 'active' : ''}`}
                 onMouseEnter={() => setActiveDay(dayKey)}
                 onMouseLeave={() => setActiveDay(null)}
-                onClick={() => handleCopy(dayKey)}
+                onClick={() => handleCopy(dayKey, index)}
                 title={`點擊複製 ${dayLabels[index]} 可打球名單`}
               >
                 <span className="day-label">{dayLabels[index]}</span>
                 <span className="day-date">{weekDates[index]}</span>
                 <span className="day-count">{players.length}</span>
                 <span className="day-text">{players.length ? '人可打' : '無人'}</span>
+                {leaveCount > 0 && <span className="leave-badge">{leaveCount}人請假</span>}
               </button>
             )
           })}
@@ -102,13 +161,31 @@ export default function MembersPage() {
           <div className="day-details">
             <h4>{dayLabels[dayKeys.indexOf(activeDay)]} 可打球名單</h4>
             <div className="players-list">
-              {getMembersForDay(activeDay).map((member) => (
+              {getMembersForDay(activeDay, dayKeys.indexOf(activeDay)).map((member) => (
                 <div key={member.member_id} className="player-tag">
                   <span className="player-name">{member.nickname}</span>
                   <span className="player-info">卡號：{member.card_number || '未填'}</span>
                 </div>
               ))}
             </div>
+            {(() => {
+              const dayIndex = dayKeys.indexOf(activeDay)
+              const dateStr = fullWeekDates[dayIndex]
+              const leavesOnDate = getLeavesForDate(dateStr)
+              return leavesOnDate.length > 0 && (
+                <div className="leaves-section">
+                  <h4>請假名單</h4>
+                  <div className="leaves-list-detail">
+                    {leavesOnDate.map((leave) => (
+                      <div key={leave.id} className="leave-tag">
+                        <span className="leave-name">{leave.nickname}</span>
+                        {leave.reason && <span className="leave-reason">{leave.reason}</span>}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )
+            })()}
           </div>
         )}
         </div>

@@ -21,6 +21,9 @@ export default function ProfilePage({ token, setStatus }) {
     sunday: false,
   })
   const [loading, setLoading] = useState(true)
+  const [leaves, setLeaves] = useState([])
+  const [leaveForm, setLeaveForm] = useState({ leave_date: '', reason: '' })
+  const [editingLeaveId, setEditingLeaveId] = useState(null)
 
   useEffect(() => {
     const fetchProfile = async () => {
@@ -51,7 +54,21 @@ export default function ProfilePage({ token, setStatus }) {
       setLoading(false)
     }
 
+    const fetchLeaves = async () => {
+      if (!token) return
+      
+      const response = await fetch(`${API_BASE_URL}/api/member/leaves`, {
+        headers: { Authorization: `Bearer ${token}` },
+      })
+      const result = await response.json()
+      
+      if (response.ok) {
+        setLeaves(result)
+      }
+    }
+
     fetchProfile()
+    fetchLeaves()
   }, [token, setStatus])
 
   const handleProfileSave = async (event) => {
@@ -110,6 +127,96 @@ export default function ProfilePage({ token, setStatus }) {
     })
     const refreshResult = await refreshResponse.json()
     setProfile(refreshResult)
+  }
+
+  const handleLeaveCreate = async (event) => {
+    event.preventDefault()
+    if (!leaveForm.leave_date) {
+      setStatus('請選擇請假日期')
+      return
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/member/leaves`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify(leaveForm),
+    })
+    const result = await response.json()
+
+    if (!response.ok) {
+      setStatus(result.detail || '新增請假失敗')
+      return
+    }
+
+    setStatus('請假新增成功')
+    setLeaveForm({ leave_date: '', reason: '' })
+    
+    // Refresh leaves
+    const refreshResponse = await fetch(`${API_BASE_URL}/api/member/leaves`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const refreshResult = await refreshResponse.json()
+    setLeaves(refreshResult)
+  }
+
+  const handleLeaveUpdate = async (leaveId) => {
+    const leave = leaves.find(l => l.id === leaveId)
+    if (!leave) return
+
+    const response = await fetch(`${API_BASE_URL}/api/member/leaves/${leaveId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ 
+        leave_date: leave.leave_date,
+        reason: leave.reason 
+      }),
+    })
+    const result = await response.json()
+
+    if (!response.ok) {
+      setStatus(result.detail || '更新請假失敗')
+      return
+    }
+
+    setStatus('請假更新成功')
+    setEditingLeaveId(null)
+    
+    // Refresh leaves
+    const refreshResponse = await fetch(`${API_BASE_URL}/api/member/leaves`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const refreshResult = await refreshResponse.json()
+    setLeaves(refreshResult)
+  }
+
+  const handleLeaveDelete = async (leaveId) => {
+    if (!confirm('確定要刪除此請假紀錄嗎？')) return
+
+    const response = await fetch(`${API_BASE_URL}/api/member/leaves/${leaveId}`, {
+      method: 'DELETE',
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const result = await response.json()
+
+    if (!response.ok) {
+      setStatus(result.detail || '刪除請假失敗')
+      return
+    }
+
+    setStatus(result.message)
+    
+    // Refresh leaves
+    const refreshResponse = await fetch(`${API_BASE_URL}/api/member/leaves`, {
+      headers: { Authorization: `Bearer ${token}` },
+    })
+    const refreshResult = await refreshResponse.json()
+    setLeaves(refreshResult)
   }
 
   if (!token) {
@@ -270,6 +377,120 @@ export default function ProfilePage({ token, setStatus }) {
               儲存時間
             </button>
           </form>
+          
+          <div className="profile-card leave-management-card">
+            <h3>🏖️ 請假管理</h3>
+            <form onSubmit={handleLeaveCreate} className="leave-form">
+              <div className="form-group">
+                <label htmlFor="leave_date">請假日期</label>
+                <input
+                  id="leave_date"
+                  type="date"
+                  value={leaveForm.leave_date}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, leave_date: e.target.value })}
+                  className="form-input"
+                  required
+                />
+              </div>
+              <div className="form-group">
+                <label htmlFor="reason">事由（選填）</label>
+                <input
+                  id="reason"
+                  type="text"
+                  placeholder="例如：出差、家庭聚會"
+                  value={leaveForm.reason}
+                  onChange={(e) => setLeaveForm({ ...leaveForm, reason: e.target.value })}
+                  className="form-input"
+                />
+              </div>
+              <button type="submit" className="save-btn save-btn-secondary">
+                <span>➕</span>
+                新增請假
+              </button>
+            </form>
+
+            {leaves.length > 0 && (
+              <div className="leaves-list">
+                <h4>我的請假紀錄</h4>
+                {leaves.map((leave) => (
+                  <div key={leave.id} className="leave-item">
+                    {editingLeaveId === leave.id ? (
+                      <div className="leave-edit-form">
+                        <input
+                          type="date"
+                          value={leave.leave_date}
+                          onChange={(e) => {
+                            setLeaves(leaves.map(l => 
+                              l.id === leave.id ? { ...l, leave_date: e.target.value } : l
+                            ))
+                          }}
+                          className="form-input-small"
+                        />
+                        <input
+                          type="text"
+                          value={leave.reason || ''}
+                          onChange={(e) => {
+                            setLeaves(leaves.map(l => 
+                              l.id === leave.id ? { ...l, reason: e.target.value } : l
+                            ))
+                          }}
+                          placeholder="事由"
+                          className="form-input-small"
+                        />
+                        <div className="leave-actions">
+                          <button 
+                            type="button"
+                            onClick={() => handleLeaveUpdate(leave.id)}
+                            className="btn-save-small"
+                          >
+                            ✓
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => setEditingLeaveId(null)}
+                            className="btn-cancel-small"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="leave-info">
+                          <span className="leave-date">
+                            📅 {new Date(leave.leave_date + 'T00:00:00').toLocaleDateString('zh-TW', { 
+                              year: 'numeric', 
+                              month: '2-digit', 
+                              day: '2-digit' 
+                            })}
+                          </span>
+                          {leave.reason && <span className="leave-reason">{leave.reason}</span>}
+                        </div>
+                        <div className="leave-actions">
+                          <button 
+                            type="button"
+                            onClick={() => setEditingLeaveId(leave.id)}
+                            className="btn-edit"
+                            title="編輯"
+                          >
+                            ✏️
+                          </button>
+                          <button 
+                            type="button"
+                            onClick={() => handleLeaveDelete(leave.id)}
+                            className="btn-delete"
+                            title="刪除"
+                          >
+                            🗑️
+                          </button>
+                        </div>
+                      </>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
           
           <div className="profile-card tip-card">
             <div className="tip-icon">💡</div>

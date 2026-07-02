@@ -104,6 +104,21 @@
   opacity: 0.8;
 }
 
+.leave-badge {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.6rem;
+  background: rgba(239, 68, 68, 0.15);
+  color: #dc2626;
+  border-radius: 999px;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.calendar-day.active .leave-badge {
+  background: rgba(255, 255, 255, 0.3);
+  color: white;
+}
+
 .day-details {
   background: linear-gradient(135deg, #f0fdfa 0%, #e0f2fe 100%);
   border-radius: 1rem;
@@ -156,6 +171,47 @@
 .player-info {
   color: #64748b;
   font-size: 0.85rem;
+}
+
+.leaves-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid rgba(15, 118, 110, 0.2);
+}
+
+.leaves-section h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #dc2626;
+  margin-bottom: 0.75rem;
+}
+
+.leaves-list-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.leave-tag {
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-size: 0.9rem;
+}
+
+.leave-name {
+  font-weight: 600;
+  color: #dc2626;
+}
+
+.leave-reason {
+  color: #64748b;
+  font-size: 0.85rem;
+  font-style: italic;
 }
 
 .copy-notification {

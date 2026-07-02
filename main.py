@@ -1,10 +1,10 @@
 import os
 from contextlib import asynccontextmanager
-from datetime import datetime, timedelta
+from datetime import date, datetime, timedelta
 from typing import AsyncIterator, List, Optional
 
 import asyncpg
-from fastapi import Depends, FastAPI, HTTPException, status
+from fastapi import Depends, FastAPI, HTTPException, Query, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from jose import JWTError, jwt
@@ -32,9 +32,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
 
 
 app = FastAPI(title="羽球會員網站 API", lifespan=lifespan)
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:5173", "http://127.0.0.1:5173"],
+    allow_origins=["*"],
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -116,6 +117,7 @@ class AvailabilitySchema(BaseModel):
 class MemberProfileResponseSchema(BaseModel):
     member_id: int
     nickname: str
+    phone: Optional[str] = None
     card_number: Optional[str] = None
     id_card_last3: str
     availability: AvailabilitySchema
@@ -135,6 +137,37 @@ class MessageResponseSchema(BaseModel):
     nickname: str
     content: str
     created_at: datetime
+
+
+class LeaveCreateSchema(BaseModel):
+    leave_date: date = Field(..., description="請假日期")
+    reason: Optional[str] = Field(None, description="請假事由/備註")
+
+
+class LeaveUpdateSchema(BaseModel):
+    leave_date: Optional[date] = Field(None, description="請假日期")
+    reason: Optional[str] = Field(None, description="請假事由/備註")
+
+
+class LeaveResponseSchema(BaseModel):
+    id: int
+    member_id: int
+    leave_date: date
+    reason: Optional[str] = None
+    created_at: datetime
+
+
+class LeaveByDateResponseSchema(BaseModel):
+    id: int
+    member_id: int
+    nickname: str
+    leave_date: date
+    reason: Optional[str] = None
+    created_at: datetime
+
+
+class LeaveByDateRangeResponseSchema(BaseModel):
+    leaves_by_date: dict[date, List[LeaveByDateResponseSchema]]
 
 
 @app.get("/health")
@@ -252,7 +285,7 @@ async def get_member_profile(
 ) -> dict:
     row = await db.fetchrow(
         """
-        SELECT m.id, m.nickname, m.card_number, m.id_card_last3,
+        SELECT m.id, m.nickname, m.phone, m.card_number, m.id_card_last3,
                a.monday, a.tuesday, a.wednesday, a.thursday, a.friday, a.saturday, a.sunday
         FROM member m
         LEFT JOIN member_availability a ON a.member_id = m.id
@@ -300,6 +333,7 @@ async def get_member_profile(
     return {
         "member_id": row["id"],
         "nickname": row["nickname"],
+        "phone": row["phone"],
         "card_number": row["card_number"],
         "id_card_last3": row["id_card_last3"],
         "availability": availability,
@@ -311,7 +345,7 @@ async def get_member_profile(
 async def get_all_members(db: asyncpg.Connection = Depends(get_db)) -> dict:
     rows = await db.fetch(
         """
-        SELECT m.id, m.nickname, m.card_number, m.id_card_last3,
+        SELECT m.id, m.nickname, m.phone, m.card_number, m.id_card_last3,
                a.monday, a.tuesday, a.wednesday, a.thursday, a.friday, a.saturday, a.sunday
         FROM member m
         LEFT JOIN member_availability a ON a.member_id = m.id
@@ -366,6 +400,146 @@ async def get_all_members(db: asyncpg.Connection = Depends(get_db)) -> dict:
         )
 
     return {"members": members}
+
+
+@app.post("/api/member/leaves", status_code=status.HTTP_201_CREATED, response_model=LeaveResponseSchema)
+async def create_leave(
+    leave_data: LeaveCreateSchema,
+    current_member_id: int = Depends(get_current_member),
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    try:
+        leave_id = await db.fetchval(
+            "INSERT INTO member_leave (member_id, leave_date, reason) VALUES ($1, $2, $3) RETURNING id;",
+            current_member_id,
+            leave_data.leave_date,
+            leave_data.reason,
+        )
+    except asyncpg.UniqueViolationError:
+        raise HTTPException(status_code=409, detail="該會員該日已存在請假紀錄") from None
+
+    row = await db.fetchrow(
+        "SELECT id, member_id, leave_date, reason, created_at FROM member_leave WHERE id = $1",
+        leave_id,
+    )
+    return dict(row)
+
+
+@app.get("/api/member/leaves", response_model=List[LeaveResponseSchema])
+async def get_my_leaves(
+    current_member_id: int = Depends(get_current_member),
+    db: asyncpg.Connection = Depends(get_db),
+) -> List[dict]:
+    rows = await db.fetch(
+        """
+        SELECT id, member_id, leave_date, reason, created_at
+        FROM member_leave
+        WHERE member_id = $1
+        ORDER BY leave_date DESC, created_at DESC;
+        """,
+        current_member_id,
+    )
+    return [dict(row) for row in rows]
+
+
+@app.get("/api/leaves", response_model=LeaveByDateRangeResponseSchema)
+async def get_leaves_by_date_range(
+    start_date: date = Query(..., description="開始日期"),
+    end_date: date = Query(..., description="結束日期"),
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    if start_date > end_date:
+        raise HTTPException(status_code=400, detail="開始日期不能晚於結束日期")
+
+    rows = await db.fetch(
+        """
+        SELECT l.id, l.member_id, m.nickname, l.leave_date, l.reason, l.created_at
+        FROM member_leave l
+        JOIN member m ON m.id = l.member_id
+        WHERE l.leave_date BETWEEN $1 AND $2
+        ORDER BY l.leave_date, m.nickname, l.created_at;
+        """,
+        start_date,
+        end_date,
+    )
+
+    leaves_by_date: dict[date, List[dict]] = {}
+    for row in rows:
+        row_date = row["leave_date"]
+        if row_date not in leaves_by_date:
+            leaves_by_date[row_date] = []
+        leaves_by_date[row_date].append(dict(row))
+
+    return {"leaves_by_date": leaves_by_date}
+
+
+@app.put("/api/member/leaves/{leave_id}", response_model=LeaveResponseSchema)
+async def update_leave(
+    leave_id: int,
+    leave_data: LeaveUpdateSchema,
+    current_member_id: int = Depends(get_current_member),
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    if leave_data.leave_date is None and leave_data.reason is None:
+        raise HTTPException(status_code=400, detail="至少提供一個要更新的欄位")
+
+    existing = await db.fetchrow(
+        "SELECT id FROM member_leave WHERE id = $1 AND member_id = $2",
+        leave_id,
+        current_member_id,
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="找不到請假紀錄")
+
+    try:
+        if leave_data.leave_date is not None and leave_data.reason is not None:
+            await db.execute(
+                "UPDATE member_leave SET leave_date = $1, reason = $2 WHERE id = $3 AND member_id = $4",
+                leave_data.leave_date,
+                leave_data.reason,
+                leave_id,
+                current_member_id,
+            )
+        elif leave_data.leave_date is not None:
+            await db.execute(
+                "UPDATE member_leave SET leave_date = $1 WHERE id = $2 AND member_id = $3",
+                leave_data.leave_date,
+                leave_id,
+                current_member_id,
+            )
+        else:
+            await db.execute(
+                "UPDATE member_leave SET reason = $1 WHERE id = $2 AND member_id = $3",
+                leave_data.reason,
+                leave_id,
+                current_member_id,
+            )
+    except asyncpg.UniqueViolationError:
+        raise HTTPException(status_code=409, detail="該會員該日已存在請假紀錄") from None
+
+    row = await db.fetchrow(
+        "SELECT id, member_id, leave_date, reason, created_at FROM member_leave WHERE id = $1",
+        leave_id,
+    )
+    return dict(row)
+
+
+@app.delete("/api/member/leaves/{leave_id}")
+async def delete_leave(
+    leave_id: int,
+    current_member_id: int = Depends(get_current_member),
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    existing = await db.fetchrow(
+        "SELECT id FROM member_leave WHERE id = $1 AND member_id = $2",
+        leave_id,
+        current_member_id,
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="找不到請假紀錄")
+
+    await db.execute("DELETE FROM member_leave WHERE id = $1 AND member_id = $2", leave_id, current_member_id)
+    return {"message": "請假紀錄刪除成功"}
 
 
 @app.post("/api/messages", status_code=status.HTTP_201_CREATED)
