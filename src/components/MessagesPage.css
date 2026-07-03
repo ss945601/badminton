@@ -101,6 +101,12 @@
   flex-wrap: wrap;
 }
 
+.message-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
 .message-author {
   font-weight: 700;
   color: #0f766e;
@@ -117,6 +123,27 @@
   line-height: 1.7;
   margin: 0;
   white-space: pre-wrap;
+}
+
+.delete-message-btn {
+  background: #fee2e2;
+  color: #b91c1c;
+  border: 1px solid #fecaca;
+  border-radius: 999px;
+  padding: 0.45rem 0.9rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.delete-message-btn:hover:not(:disabled) {
+  background: #fecaca;
+}
+
+.delete-message-btn:disabled {
+  opacity: 0.7;
+  cursor: not-allowed;
 }
 
 .loading, .empty-state {

@@ -6,6 +6,26 @@ export default function MessagesPage({ token, setStatus }) {
   const [messages, setMessages] = useState([])
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
+  const [deletingId, setDeletingId] = useState(null)
+
+  const isOwner = (messageItem) => {
+    if (!token) {
+      return false
+    }
+
+    if (messageItem.member_id === undefined || messageItem.member_id === null) {
+      return false
+    }
+
+    try {
+      const payload = token.split('.')[1]
+      const decoded = JSON.parse(atob(payload.replace(/-/g, '+').replace(/_/g, '/')))
+      console.log(Number(decoded.sub), Number(messageItem.member_id))
+      return Number(decoded.sub) === Number(messageItem.member_id)
+    } catch {
+      return false
+    }
+  }
 
   useEffect(() => {
     const fetchMessages = async () => {
@@ -22,6 +42,12 @@ export default function MessagesPage({ token, setStatus }) {
 
     fetchMessages()
   }, [setStatus])
+
+  const refreshMessages = async () => {
+    const response = await fetch(`${API_BASE_URL}/api/messages`)
+    const data = await response.json()
+    setMessages(data)
+  }
 
   const handleMessageSubmit = async (event) => {
     event.preventDefault()
@@ -47,9 +73,36 @@ export default function MessagesPage({ token, setStatus }) {
 
     setMessage('')
     setStatus(result.message)
-    const refreshed = await fetch(`${API_BASE_URL}/api/messages`)
-    const data = await refreshed.json()
-    setMessages(data)
+    await refreshMessages()
+  }
+
+  const handleDeleteMessage = async (messageId) => {
+    if (!token) {
+      setStatus('請先登入後再刪除留言')
+      return
+    }
+
+    setDeletingId(messageId)
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/messages/${messageId}`, {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${token}`,
+        },
+      })
+      const result = await response.json()
+
+      if (!response.ok) {
+        setStatus(result.detail || '刪除留言失敗')
+        return
+      }
+
+      setStatus(result.message)
+      await refreshMessages()
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   return (
@@ -85,16 +138,28 @@ export default function MessagesPage({ token, setStatus }) {
           messages.map((item) => (
             <div key={item.id} className="message-card">
               <div className="message-header">
-                <span className="message-author">{item.nickname}</span>
-                <span className="message-time">
-                  {new Date(item.created_at).toLocaleString('zh-TW', {
-                    year: 'numeric',
-                    month: 'short',
-                    day: 'numeric',
-                    hour: '2-digit',
-                    minute: '2-digit'
-                  })}
-                </span>
+                <div className="message-meta">
+                  <span className="message-author">{item.nickname}</span>
+                  <span className="message-time">
+                    {new Date(item.created_at).toLocaleString('zh-TW', {
+                      year: 'numeric',
+                      month: 'short',
+                      day: 'numeric',
+                      hour: '2-digit',
+                      minute: '2-digit'
+                    })}
+                  </span>
+                </div>
+                {isOwner(item) && (
+                  <button
+                    type="button"
+                    className="delete-message-btn"
+                    onClick={() => handleDeleteMessage(item.id)}
+                    disabled={deletingId === item.id}
+                  >
+                    {deletingId === item.id ? '刪除中...' : '刪除留言'}
+                  </button>
+                )}
               </div>
               <p className="message-content">{item.content}</p>
             </div>
