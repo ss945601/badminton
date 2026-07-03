@@ -2,11 +2,117 @@ import { useEffect, useState } from 'react'
 import { API_BASE_URL } from '../constants'
 import './MessagesPage.css'
 
+function MessageItem({
+  msg,
+  depth = 0,
+  token,
+  replyingTo,
+  replyDraft,
+  setReplyDraft,
+  handleReply,
+  cancelReply,
+  handleReplySubmit,
+  deletingId,
+  isOwner,
+  handleDeleteMessage,
+}) {
+  const isParent = depth === 0
+  const messageClass = isParent ? 'parent-message' : 'reply-message'
+
+  return (
+    <div className="message-item">
+      <div className={`message-card ${messageClass}`}>
+        <div className="message-header">
+          <div className="message-meta">
+            {!isParent && <span className="reply-indicator">↳</span>}
+            <span className="message-author">{msg.nickname}</span>
+            <span className="message-time">
+              {new Date(msg.created_at).toLocaleString('zh-TW', {
+                year: 'numeric',
+                month: 'short',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+              })}
+            </span>
+          </div>
+          <div className="message-actions">
+            {token && (
+              <button type="button" className="reply-btn" onClick={() => handleReply(msg.id)}>
+                💬 回覆
+              </button>
+            )}
+            {isOwner(msg) && (
+              <button
+                type="button"
+                className="delete-message-btn"
+                onClick={() => handleDeleteMessage(msg.id)}
+                disabled={deletingId === msg.id}
+              >
+                {deletingId === msg.id ? '刪除中...' : '🗑️ 刪除'}
+              </button>
+            )}
+          </div>
+        </div>
+        <p className="message-content">{msg.content}</p>
+      </div>
+
+      <div className={`reply-form ${replyingTo === msg.id ? 'reply-form-open' : 'reply-form-hidden'}`}>
+        {replyingTo === msg.id && (
+          <form onSubmit={(e) => handleReplySubmit(e, msg.id)}>
+            <div className="reply-form-header">
+              <span>💬 回覆 {msg.nickname}</span>
+              <button type="button" onClick={cancelReply} className="cancel-reply-btn">
+                ✕ 取消
+              </button>
+            </div>
+            <textarea
+              value={replyDraft}
+              onChange={(event) => setReplyDraft(event.target.value)}
+              placeholder="輸入你的回覆..."
+              required
+              className="reply-input"
+            />
+            <button type="submit" className="submit-reply-btn">
+              <span className="btn-icon">📤</span>
+              送出回覆
+            </button>
+          </form>
+        )}
+      </div>
+
+      {msg.replies && msg.replies.length > 0 && (
+        <div className="replies-container">
+          {msg.replies.map((reply) => (
+            <MessageItem
+              key={reply.id}
+              msg={reply}
+              depth={depth + 1}
+              token={token}
+              replyingTo={replyingTo}
+              replyDraft={replyDraft}
+              setReplyDraft={setReplyDraft}
+              handleReply={handleReply}
+              cancelReply={cancelReply}
+              handleReplySubmit={handleReplySubmit}
+              deletingId={deletingId}
+              isOwner={isOwner}
+              handleDeleteMessage={handleDeleteMessage}
+            />
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 export default function MessagesPage({ token, setStatus }) {
   const [messages, setMessages] = useState([])
   const [message, setMessage] = useState('')
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState(null)
+  const [replyingTo, setReplyingTo] = useState(null)
+  const [replyDraft, setReplyDraft] = useState('')
 
   const isOwner = (messageItem) => {
     if (!token) {
@@ -62,7 +168,10 @@ export default function MessagesPage({ token, setStatus }) {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${token}`,
       },
-      body: JSON.stringify({ content: message }),
+      body: JSON.stringify({ 
+        content: message,
+        parent_id: null
+      }),
     })
     const result = await response.json()
 
@@ -72,6 +181,43 @@ export default function MessagesPage({ token, setStatus }) {
     }
 
     setMessage('')
+    setStatus(result.message)
+    await refreshMessages()
+  }
+
+  const handleReplySubmit = async (event, parentId) => {
+    event.preventDefault()
+    if (!token) {
+      setStatus('請先登入後再留言')
+      return
+    }
+
+    const replyContent = replyDraft.trim()
+    if (!replyContent) {
+      setStatus('請輸入回覆內容')
+      return
+    }
+
+    const response = await fetch(`${API_BASE_URL}/api/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${token}`,
+      },
+      body: JSON.stringify({ 
+        content: replyContent,
+        parent_id: parentId
+      }),
+    })
+    const result = await response.json()
+
+    if (!response.ok) {
+      setStatus(result.detail || '回覆失敗')
+      return
+    }
+
+    setReplyDraft('')
+    setReplyingTo(null)
     setStatus(result.message)
     await refreshMessages()
   }
@@ -105,6 +251,33 @@ export default function MessagesPage({ token, setStatus }) {
     }
   }
 
+  const handleReply = (messageId) => {
+    setReplyingTo(messageId)
+    setReplyDraft('')
+  }
+
+  const cancelReply = () => {
+    setReplyingTo(null)
+    setReplyDraft('')
+  }
+
+  // 遞歸組織留言結構，支持多層級回覆
+  const buildMessageTree = (messages, parentId = null) => {
+    const filtered = messages.filter(msg => msg.parent_id === parentId)
+    
+    // 主留言按照時間倒序（最新的在上面），回覆按照時間正序（舊的在上面）
+    const sorted = parentId === null 
+      ? filtered.sort((a, b) => new Date(b.created_at) - new Date(a.created_at))
+      : filtered.sort((a, b) => new Date(a.created_at) - new Date(b.created_at))
+    
+    return sorted.map(msg => ({
+      ...msg,
+      replies: buildMessageTree(messages, msg.id)
+    }))
+  }
+
+  const organizedMessages = buildMessageTree(messages)
+
   return (
     <div className="messages-page">
       <div className="messages-header">
@@ -129,39 +302,28 @@ export default function MessagesPage({ token, setStatus }) {
       <div className="messages-list">
         {loading ? (
           <div className="loading">載入中...</div>
-        ) : messages.length === 0 ? (
+        ) : organizedMessages.length === 0 ? (
           <div className="empty-state">
             <span className="empty-icon">📭</span>
             <p>還沒有留言，成為第一個留言的人吧！</p>
           </div>
         ) : (
-          messages.map((item) => (
-            <div key={item.id} className="message-card">
-              <div className="message-header">
-                <div className="message-meta">
-                  <span className="message-author">{item.nickname}</span>
-                  <span className="message-time">
-                    {new Date(item.created_at).toLocaleString('zh-TW', {
-                      year: 'numeric',
-                      month: 'short',
-                      day: 'numeric',
-                      hour: '2-digit',
-                      minute: '2-digit'
-                    })}
-                  </span>
-                </div>
-                {isOwner(item) && (
-                  <button
-                    type="button"
-                    className="delete-message-btn"
-                    onClick={() => handleDeleteMessage(item.id)}
-                    disabled={deletingId === item.id}
-                  >
-                    {deletingId === item.id ? '刪除中...' : '刪除留言'}
-                  </button>
-                )}
-              </div>
-              <p className="message-content">{item.content}</p>
+          organizedMessages.map((msg) => (
+            <div key={msg.id} className="message-thread">
+              <MessageItem
+                msg={msg}
+                depth={0}
+                token={token}
+                replyingTo={replyingTo}
+                replyDraft={replyDraft}
+                setReplyDraft={setReplyDraft}
+                handleReply={handleReply}
+                cancelReply={cancelReply}
+                handleReplySubmit={handleReplySubmit}
+                deletingId={deletingId}
+                isOwner={isOwner}
+                handleDeleteMessage={handleDeleteMessage}
+              />
             </div>
           ))
         )}

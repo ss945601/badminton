@@ -130,10 +130,13 @@ class MembersListResponseSchema(BaseModel):
 
 class MessageCreateSchema(BaseModel):
     content: str
+    parent_id: Optional[int] = Field(None, description="回覆的父留言 ID，允許為空")
 
 
 class MessageResponseSchema(BaseModel):
     id: int
+    member_id: int
+    parent_id: Optional[int] = None
     nickname: str
     content: str
     created_at: datetime
@@ -549,18 +552,40 @@ async def create_message(
     db: asyncpg.Connection = Depends(get_db),
 ) -> dict:
     message_id = await db.fetchval(
-        "INSERT INTO member_message_board (member_id, content) VALUES ($1, $2) RETURNING id;",
+        "INSERT INTO member_message_board (member_id, content, parent_id) VALUES ($1, $2, $3) RETURNING id;",
         current_member_id,
         msg.content,
+        msg.parent_id,
     )
     return {"message": "留言成功", "message_id": message_id}
+
+
+@app.delete("/api/messages/{message_id}")
+async def delete_message(
+    message_id: int,
+    current_member_id: int = Depends(get_current_member),
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    message_row = await db.fetchrow(
+        "SELECT member_id FROM member_message_board WHERE id = $1",
+        message_id,
+    )
+
+    if not message_row:
+        raise HTTPException(status_code=404, detail="找不到留言")
+
+    if message_row["member_id"] != current_member_id:
+        raise HTTPException(status_code=403, detail="只能刪除自己的留言")
+
+    await db.execute("DELETE FROM member_message_board WHERE id = $1", message_id)
+    return {"message": "留言刪除成功"}
 
 
 @app.get("/api/messages", response_model=List[MessageResponseSchema])
 async def get_messages(db: asyncpg.Connection = Depends(get_db)) -> List[dict]:
     rows = await db.fetch(
         """
-        SELECT b.id, m.nickname, b.content, b.created_at
+        SELECT b.id, b.member_id, b.parent_id, m.nickname, b.content, b.created_at
         FROM member_message_board b
         JOIN member m ON b.member_id = m.id
         ORDER BY b.created_at DESC;
