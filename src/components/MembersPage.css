@@ -73,7 +73,6 @@
 }
 
 .calendar-day:hover {
-  transform: translateY(-4px);
   box-shadow: 0 8px 20px rgba(15, 118, 110, 0.15);
 }
 
