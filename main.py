@@ -508,6 +508,39 @@ async def get_all_members(db: asyncpg.Connection = Depends(get_db)) -> dict:
     return {"members": members}
 
 
+@app.get("/api/card-locks", response_model=List[MemberCardLockResponseSchema])
+async def list_all_card_locks(
+    start_time: Optional[datetime] = Query(None, description="搜尋開始時間"),
+    end_time: Optional[datetime] = Query(None, description="搜尋結束時間"),
+    db: asyncpg.Connection = Depends(get_db),
+) -> List[dict]:
+    if start_time is not None and end_time is not None and start_time > end_time:
+        raise HTTPException(status_code=400, detail="開始時間不能晚於結束時間")
+
+    query = """
+        SELECT id, member_id, start_time, end_time, reason, created_at
+        FROM member_card_lock
+    """
+    params: List[datetime] = []
+    conditions: List[str] = []
+
+    if start_time is not None:
+        conditions.append(f"end_time >= ${len(params) + 1}")
+        params.append(start_time)
+
+    if end_time is not None:
+        conditions.append(f"start_time <= ${len(params) + 1}")
+        params.append(end_time)
+
+    if conditions:
+        query += " WHERE " + " AND ".join(conditions)
+
+    query += " ORDER BY start_time;"
+
+    rows = await db.fetch(query, *params)
+    return [dict(row) for row in rows]
+
+
 @app.get("/api/members/{member_id}/card-locks", response_model=List[MemberCardLockResponseSchema])
 async def list_member_card_locks(member_id: int, db: asyncpg.Connection = Depends(get_db)) -> List[dict]:
     existing = await db.fetchrow("SELECT id FROM member WHERE id = $1", member_id)

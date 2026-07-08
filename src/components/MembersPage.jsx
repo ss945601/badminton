@@ -28,24 +28,32 @@ export default function MembersPage() {
 
   useEffect(() => {
     const fetchMembers = async () => {
-      const response = await fetch(`${API_BASE_URL}/api/members`)
-      const result = await response.json()
-      setMembers(result.members || [])
-      
-      // 獲取所有會員的鎖卡記錄
-      const allCardLocks = {}
-      for (const member of result.members || []) {
-        try {
-          const locksResponse = await fetch(`${API_BASE_URL}/api/members/${member.member_id}/card-locks`)
-          const locks = await locksResponse.json()
-          allCardLocks[member.member_id] = locks || []
-        } catch (error) {
-          console.error(`Failed to fetch card locks for member ${member.member_id}`, error)
-          allCardLocks[member.member_id] = []
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/members`)
+        const result = await response.json()
+        const membersData = result.members || []
+        setMembers(membersData)
+
+        const { start, end } = getWeekRange()
+        const locksResponse = await fetch(
+          `${API_BASE_URL}/api/card-locks?start_time=${encodeURIComponent(`${start}T00:00:00`)}&end_time=${encodeURIComponent(`${end}T23:59:59`)}`
+        )
+        const locks = await locksResponse.json()
+
+        const locksByMemberId = {}
+        for (const lock of locks || []) {
+          if (!locksByMemberId[lock.member_id]) {
+            locksByMemberId[lock.member_id] = []
+          }
+          locksByMemberId[lock.member_id].push(lock)
         }
+        setCardLocks(locksByMemberId)
+      } catch (error) {
+        console.error('Failed to fetch members or card locks', error)
+        setCardLocks({})
+      } finally {
+        setLoading(false)
       }
-      setCardLocks(allCardLocks)
-      setLoading(false)
     }
 
     const fetchLeaves = async () => {
