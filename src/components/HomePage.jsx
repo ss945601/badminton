@@ -1,12 +1,42 @@
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import homeImage from '../assets/home_img.png'
+import { API_BASE_URL } from '../constants'
 import './HomePage.css'
 
 export default function HomePage({ token }) {
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    const fetchAdminStatus = async () => {
+      if (!token) {
+        setIsAdmin(false)
+        return
+      }
+
+      try {
+        const response = await fetch(`${API_BASE_URL}/api/member/me`, {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          setIsAdmin(Boolean(data.is_admin))
+        } else {
+          setIsAdmin(false)
+        }
+      } catch {
+        setIsAdmin(false)
+      }
+    }
+
+    fetchAdminStatus()
+  }, [token])
+
   return (
     <div className="home-page">
-
-
       <div className="features-grid">
         <div className="feature-card">
           <div className="feature-icon">👥</div>
@@ -32,6 +62,15 @@ export default function HomePage({ token }) {
             <Link to="/register" className="feature-link">立即註冊 →</Link>
           )}
         </div>
+
+        {isAdmin && (
+          <div className="feature-card">
+            <div className="feature-icon">🔧</div>
+            <h3>管理者後台</h3>
+            <p>管理會員權限、設定鎖卡與維護活動資料。</p>
+            <Link to="/admin" className="feature-link">進入管理者頁 →</Link>
+          </div>
+        )}
       </div>
 
       {!token && (

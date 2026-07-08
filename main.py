@@ -104,6 +104,31 @@ class UpdateMemberProfileSchema(BaseModel):
     )
 
 
+class AdminStatusUpdateSchema(BaseModel):
+    is_admin: bool = Field(..., description="是否為管理員")
+
+
+class MemberCardLockCreateSchema(BaseModel):
+    start_time: datetime = Field(..., description="鎖卡開始時間")
+    end_time: datetime = Field(..., description="鎖卡結束時間")
+    reason: Optional[str] = Field(None, description="鎖卡原因")
+
+
+class MemberCardLockUpdateSchema(BaseModel):
+    start_time: Optional[datetime] = Field(None, description="鎖卡開始時間")
+    end_time: Optional[datetime] = Field(None, description="鎖卡結束時間")
+    reason: Optional[str] = Field(None, description="鎖卡原因")
+
+
+class MemberCardLockResponseSchema(BaseModel):
+    id: int
+    member_id: int
+    start_time: datetime
+    end_time: datetime
+    reason: Optional[str] = None
+    created_at: datetime
+
+
 class AvailabilitySchema(BaseModel):
     monday: bool = False
     tuesday: bool = False
@@ -120,6 +145,7 @@ class MemberProfileResponseSchema(BaseModel):
     phone: Optional[str] = None
     card_number: Optional[str] = None
     id_card_last3: str
+    is_admin: bool = False
     availability: AvailabilitySchema
     available_days: List[str]
 
@@ -288,7 +314,7 @@ async def get_member_profile(
 ) -> dict:
     row = await db.fetchrow(
         """
-        SELECT m.id, m.nickname, m.phone, m.card_number, m.id_card_last3,
+        SELECT m.id, m.nickname, m.phone, m.card_number, m.id_card_last3, m.is_admin,
                a.monday, a.tuesday, a.wednesday, a.thursday, a.friday, a.saturday, a.sunday
         FROM member m
         LEFT JOIN member_availability a ON a.member_id = m.id
@@ -339,16 +365,92 @@ async def get_member_profile(
         "phone": row["phone"],
         "card_number": row["card_number"],
         "id_card_last3": row["id_card_last3"],
+        "is_admin": bool(row["is_admin"]) if row.get("is_admin") is not None else False,
         "availability": availability,
         "available_days": available_days,
     }
+
+
+@app.get("/api/members/{member_id}", response_model=MemberProfileResponseSchema)
+async def get_member_by_id(member_id: int, db: asyncpg.Connection = Depends(get_db)) -> dict:
+    row = await db.fetchrow(
+        """
+        SELECT m.id, m.nickname, m.phone, m.card_number, m.id_card_last3, m.is_admin,
+               a.monday, a.tuesday, a.wednesday, a.thursday, a.friday, a.saturday, a.sunday
+        FROM member m
+        LEFT JOIN member_availability a ON a.member_id = m.id
+        WHERE m.id = $1;
+        """,
+        member_id,
+    )
+
+    if not row:
+        raise HTTPException(status_code=404, detail="找不到會員資料")
+
+    availability = AvailabilitySchema(
+        monday=bool(row["monday"]),
+        tuesday=bool(row["tuesday"]),
+        wednesday=bool(row["wednesday"]),
+        thursday=bool(row["thursday"]),
+        friday=bool(row["friday"]),
+        saturday=bool(row["saturday"]),
+        sunday=bool(row["sunday"]),
+    )
+
+    day_labels = {
+        "monday": "週一",
+        "tuesday": "週二",
+        "wednesday": "週三",
+        "thursday": "週四",
+        "friday": "週五",
+        "saturday": "週六",
+        "sunday": "週日",
+    }
+    available_days = [
+        day_labels[day_name]
+        for day_name, is_available in {
+            "monday": availability.monday,
+            "tuesday": availability.tuesday,
+            "wednesday": availability.wednesday,
+            "thursday": availability.thursday,
+            "friday": availability.friday,
+            "saturday": availability.saturday,
+            "sunday": availability.sunday,
+        }.items()
+        if is_available
+    ]
+
+    return {
+        "member_id": row["id"],
+        "nickname": row["nickname"],
+        "phone": row["phone"],
+        "card_number": row["card_number"],
+        "id_card_last3": row["id_card_last3"],
+        "is_admin": bool(row["is_admin"]) if row.get("is_admin") is not None else False,
+        "availability": availability,
+        "available_days": available_days,
+    }
+
+
+@app.put("/api/members/{member_id}/admin")
+async def update_member_admin_status(
+    member_id: int,
+    admin_data: AdminStatusUpdateSchema,
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    existing = await db.fetchrow("SELECT id FROM member WHERE id = $1", member_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="找不到會員資料")
+
+    await db.execute("UPDATE member SET is_admin = $1 WHERE id = $2", admin_data.is_admin, member_id)
+    return {"member_id": member_id, "is_admin": admin_data.is_admin}
 
 
 @app.get("/api/members", response_model=MembersListResponseSchema)
 async def get_all_members(db: asyncpg.Connection = Depends(get_db)) -> dict:
     rows = await db.fetch(
         """
-        SELECT m.id, m.nickname, m.phone, m.card_number, m.id_card_last3,
+        SELECT m.id, m.nickname, m.phone, m.card_number, m.id_card_last3, m.is_admin,
                a.monday, a.tuesday, a.wednesday, a.thursday, a.friday, a.saturday, a.sunday
         FROM member m
         LEFT JOIN member_availability a ON a.member_id = m.id
@@ -397,12 +499,121 @@ async def get_all_members(db: asyncpg.Connection = Depends(get_db)) -> dict:
                 "nickname": row["nickname"],
                 "card_number": row["card_number"],
                 "id_card_last3": row["id_card_last3"],
+                "is_admin": bool(row["is_admin"]) if row.get("is_admin") is not None else False,
                 "availability": availability,
                 "available_days": available_days,
             }
         )
 
     return {"members": members}
+
+
+@app.get("/api/members/{member_id}/card-locks", response_model=List[MemberCardLockResponseSchema])
+async def list_member_card_locks(member_id: int, db: asyncpg.Connection = Depends(get_db)) -> List[dict]:
+    existing = await db.fetchrow("SELECT id FROM member WHERE id = $1", member_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="找不到會員資料")
+
+    rows = await db.fetch(
+        """
+        SELECT id, member_id, start_time, end_time, reason, created_at
+        FROM member_card_lock
+        WHERE member_id = $1
+        ORDER BY start_time;
+        """,
+        member_id,
+    )
+    return [dict(row) for row in rows]
+
+
+@app.post(
+    "/api/members/{member_id}/card-locks",
+    status_code=status.HTTP_201_CREATED,
+    response_model=MemberCardLockResponseSchema,
+)
+async def create_member_card_lock(
+    member_id: int,
+    lock_data: MemberCardLockCreateSchema,
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    if lock_data.end_time <= lock_data.start_time:
+        raise HTTPException(status_code=400, detail="鎖卡結束時間必須晚於開始時間")
+
+    existing = await db.fetchrow("SELECT id FROM member WHERE id = $1", member_id)
+    if not existing:
+        raise HTTPException(status_code=404, detail="找不到會員資料")
+
+    lock_id = await db.fetchval(
+        """
+        INSERT INTO member_card_lock (member_id, start_time, end_time, reason)
+        VALUES ($1, $2, $3, $4) RETURNING id;
+        """,
+        member_id,
+        lock_data.start_time,
+        lock_data.end_time,
+        lock_data.reason,
+    )
+
+    row = await db.fetchrow(
+        "SELECT id, member_id, start_time, end_time, reason, created_at FROM member_card_lock WHERE id = $1",
+        lock_id,
+    )
+    return dict(row)
+
+
+@app.put("/api/members/{member_id}/card-locks/{lock_id}", response_model=MemberCardLockResponseSchema)
+async def update_member_card_lock(
+    member_id: int,
+    lock_id: int,
+    lock_data: MemberCardLockUpdateSchema,
+    db: asyncpg.Connection = Depends(get_db),
+) -> dict:
+    if lock_data.start_time is None and lock_data.end_time is None and lock_data.reason is None:
+        raise HTTPException(status_code=400, detail="至少提供一個要更新的欄位")
+
+    existing = await db.fetchrow(
+        "SELECT id, member_id, start_time, end_time, reason FROM member_card_lock WHERE id = $1 AND member_id = $2",
+        lock_id,
+        member_id,
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="找不到卡片鎖定紀錄")
+
+    new_start_time = lock_data.start_time if lock_data.start_time is not None else existing["start_time"]
+    new_end_time = lock_data.end_time if lock_data.end_time is not None else existing["end_time"]
+    new_reason = lock_data.reason if lock_data.reason is not None else existing["reason"]
+
+    if new_end_time <= new_start_time:
+        raise HTTPException(status_code=400, detail="鎖卡結束時間必須晚於開始時間")
+
+    await db.execute(
+        "UPDATE member_card_lock SET start_time = $1, end_time = $2, reason = $3 WHERE id = $4 AND member_id = $5",
+        new_start_time,
+        new_end_time,
+        new_reason,
+        lock_id,
+        member_id,
+    )
+
+    row = await db.fetchrow(
+        "SELECT id, member_id, start_time, end_time, reason, created_at FROM member_card_lock WHERE id = $1",
+        lock_id,
+    )
+    return dict(row)
+
+
+@app.delete("/api/members/{member_id}/card-locks/{lock_id}")
+async def delete_member_card_lock(member_id: int, lock_id: int, db: asyncpg.Connection = Depends(get_db)) -> dict:
+    existing = await db.fetchrow(
+        "SELECT id FROM member_card_lock WHERE id = $1 AND member_id = $2",
+        lock_id,
+        member_id,
+    )
+    if not existing:
+        raise HTTPException(status_code=404, detail="找不到卡片鎖定紀錄")
+
+    await db.execute("DELETE FROM member_card_lock WHERE id = $1 AND member_id = $2", lock_id, member_id)
+    return {"message": "卡片鎖定紀錄刪除成功"}
 
 
 @app.post("/api/member/leaves", status_code=status.HTTP_201_CREATED, response_model=LeaveResponseSchema)

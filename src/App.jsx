@@ -8,6 +8,7 @@ import LoginPage from './components/LoginPage'
 import MembersPage from './components/MembersPage'
 import MessagesPage from './components/MessagesPage'
 import ProfilePage from './components/ProfilePage'
+import AdminPage from './components/AdminPage'
 import { getStoredToken, clearStoredToken } from './utils/auth'
 import './App.css'
 
@@ -40,6 +41,10 @@ function App() {
           <Route
             path="/profile"
             element={<ProfilePage token={token} setStatus={setStatus} />}
+          />
+          <Route
+            path="/admin"
+            element={<AdminPage token={token} setStatus={setStatus} />}
           />
         </Routes>
       </main>

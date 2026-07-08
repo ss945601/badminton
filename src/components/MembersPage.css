@@ -113,7 +113,18 @@
   margin-top: 0.25rem;
 }
 
-.calendar-day.active .leave-badge {
+.lock-badge {
+  font-size: 0.7rem;
+  padding: 0.25rem 0.6rem;
+  background: rgba(255, 152, 0, 0.15);
+  color: #f57c00;
+  border-radius: 999px;
+  font-weight: 600;
+  margin-top: 0.25rem;
+}
+
+.calendar-day.active .leave-badge,
+.calendar-day.active .lock-badge {
   background: rgba(255, 255, 255, 0.3);
   color: white;
 }
@@ -213,6 +224,47 @@
 .leave-reason {
   color: #64748b;
   font-size: 0.85rem;
+  font-style: italic;
+}
+
+.locks-section {
+  margin-top: 1.5rem;
+  padding-top: 1.5rem;
+  border-top: 2px solid rgba(255, 152, 0, 0.2);
+}
+
+.locks-section h4 {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: #f57c00;
+  margin-bottom: 0.75rem;
+}
+
+.locks-list-detail {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem;
+}
+
+.lock-tag {
+  background: #fff3e0;
+  border: 1px solid #ffe0b2;
+  border-radius: 999px;
+  padding: 0.5rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  font-size: 0.9rem;
+}
+
+.lock-name {
+  font-weight: 600;
+  color: #f57c00;
+}
+
+.lock-reason {
+  color: #64748b;
+  font-size: 0.8rem;
   font-style: italic;
 }
 

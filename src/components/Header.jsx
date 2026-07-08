@@ -1,7 +1,35 @@
+import { useState, useEffect } from 'react'
 import { NavLink } from 'react-router-dom'
+import { API_BASE_URL } from '../constants'
 import './Header.css'
 
 export default function Header({ token, onLogout }) {
+  const [isAdmin, setIsAdmin] = useState(false)
+
+  useEffect(() => {
+    if (token) {
+      fetchUserProfile()
+    } else {
+      setIsAdmin(false)
+    }
+  }, [token])
+
+  const fetchUserProfile = async () => {
+    try {
+      const response = await fetch(`${API_BASE_URL}/api/member/me`, {
+        headers: {
+          'Authorization': `Bearer ${token}`
+        }
+      })
+      if (response.ok) {
+        const data = await response.json()
+        setIsAdmin(data.is_admin || false)
+      }
+    } catch (error) {
+      console.error('Failed to fetch user profile', error)
+    }
+  }
+
   return (
     <header className="app-header">
       <div className="header-content">
@@ -41,6 +69,12 @@ export default function Header({ token, onLogout }) {
                 <span className="nav-icon">⚙️</span>
                 會員資料
               </NavLink>
+              {isAdmin && (
+                <NavLink to="/admin" className="nav-link nav-link-admin">
+                  <span className="nav-icon">🔧</span>
+                  管理者
+                </NavLink>
+              )}
               <button className="nav-link nav-link-logout" onClick={onLogout}>
                 登出
               </button>

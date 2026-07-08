@@ -8,6 +8,7 @@ export default function MembersPage() {
   const [activeDay, setActiveDay] = useState(null)
   const [copyState, setCopyState] = useState('')
   const [leavesByDate, setLeavesByDate] = useState({})
+  const [cardLocks, setCardLocks] = useState({}) // 新增：儲存所有會員的鎖卡記錄
 
   const getWeekRange = () => {
     const today = new Date()
@@ -30,6 +31,20 @@ export default function MembersPage() {
       const response = await fetch(`${API_BASE_URL}/api/members`)
       const result = await response.json()
       setMembers(result.members || [])
+      
+      // 獲取所有會員的鎖卡記錄
+      const allCardLocks = {}
+      for (const member of result.members || []) {
+        try {
+          const locksResponse = await fetch(`${API_BASE_URL}/api/members/${member.member_id}/card-locks`)
+          const locks = await locksResponse.json()
+          allCardLocks[member.member_id] = locks || []
+        } catch (error) {
+          console.error(`Failed to fetch card locks for member ${member.member_id}`, error)
+          allCardLocks[member.member_id] = []
+        }
+      }
+      setCardLocks(allCardLocks)
       setLoading(false)
     }
 
@@ -83,19 +98,65 @@ export default function MembersPage() {
     return leavesByDate[dateStr] || []
   }
 
+  // 新增：檢查會員在特定日期時間是否被鎖卡
+  const isMemberLockedOnDate = (memberId, dateStr) => {
+    const locks = cardLocks[memberId] || []
+    if (locks.length === 0) return false
+
+    // 將日期字串轉換為當天的開始和結束時間
+    const dayStart = new Date(dateStr + 'T00:00:00')
+    const dayEnd = new Date(dateStr + 'T23:59:59')
+
+    return locks.some(lock => {
+      const lockStart = new Date(lock.start_time)
+      const lockEnd = new Date(lock.end_time)
+      
+      // 檢查鎖卡期間是否與當天有重疊
+      return lockStart <= dayEnd && lockEnd >= dayStart
+    })
+  }
+
+  // 新增：獲取會員在特定日期的鎖卡記錄
+  const getMemberLocksOnDate = (memberId, dateStr) => {
+    const locks = cardLocks[memberId] || []
+    if (locks.length === 0) return []
+
+    const dayStart = new Date(dateStr + 'T00:00:00')
+    const dayEnd = new Date(dateStr + 'T23:59:59')
+
+    return locks.filter(lock => {
+      const lockStart = new Date(lock.start_time)
+      const lockEnd = new Date(lock.end_time)
+      return lockStart <= dayEnd && lockEnd >= dayStart
+    })
+  }
+
   const getMembersForDay = (dayKey, dayIndex) => {
     const availableMembers = members.filter((member) => member.availability?.[dayKey])
     const dateStr = fullWeekDates[dayIndex]
     const leavesOnDate = getLeavesForDate(dateStr)
     const leaveIds = leavesOnDate.map(leave => leave.member_id)
     
-    return availableMembers.filter(member => !leaveIds.includes(member.member_id))
+    // 排除請假的會員和被鎖卡的會員
+    return availableMembers.filter(member => 
+      !leaveIds.includes(member.member_id) && 
+      !isMemberLockedOnDate(member.member_id, dateStr)
+    )
   }
 
   const getLeaveCountForDay = (dayIndex) => {
     const dateStr = fullWeekDates[dayIndex]
     const leavesOnDate = getLeavesForDate(dateStr)
     return leavesOnDate.length
+  }
+
+  // 新增：獲取當天被鎖卡的會員數量
+  const getLockedCountForDay = (dayIndex) => {
+    const dateStr = fullWeekDates[dayIndex]
+    return members.filter(member => 
+      member.availability?.[dayKeys[dayIndex]] && 
+      isMemberLockedOnDate(member.member_id, dateStr)
+    ).length
   }
 
   const handleCopy = async (dayKey, dayIndex) => {
@@ -136,6 +197,7 @@ export default function MembersPage() {
           {dayKeys.map((dayKey, index) => {
             const players = getMembersForDay(dayKey, index)
             const leaveCount = getLeaveCountForDay(index)
+            const lockedCount = getLockedCountForDay(index)
             return (
               <button
                 key={dayKey}
@@ -151,6 +213,7 @@ export default function MembersPage() {
                 <span className="day-count">{players.length}</span>
                 <span className="day-text">{players.length ? '人可打' : '無人'}</span>
                 {leaveCount > 0 && <span className="leave-badge">{leaveCount}人請假</span>}
+                {lockedCount > 0 && <span className="lock-badge">{lockedCount}人鎖卡</span>}
               </button>
             )
           })}
@@ -172,18 +235,46 @@ export default function MembersPage() {
               const dayIndex = dayKeys.indexOf(activeDay)
               const dateStr = fullWeekDates[dayIndex]
               const leavesOnDate = getLeavesForDate(dateStr)
-              return leavesOnDate.length > 0 && (
-                <div className="leaves-section">
-                  <h4>請假名單</h4>
-                  <div className="leaves-list-detail">
-                    {leavesOnDate.map((leave) => (
-                      <div key={leave.id} className="leave-tag">
-                        <span className="leave-name">{leave.nickname}</span>
-                        {leave.reason && <span className="leave-reason">{leave.reason}</span>}
+              const lockedMembers = members.filter(member => 
+                member.availability?.[activeDay] && 
+                isMemberLockedOnDate(member.member_id, dateStr)
+              )
+              return (
+                <>
+                  {leavesOnDate.length > 0 && (
+                    <div className="leaves-section">
+                      <h4>請假名單</h4>
+                      <div className="leaves-list-detail">
+                        {leavesOnDate.map((leave) => (
+                          <div key={leave.id} className="leave-tag">
+                            <span className="leave-name">{leave.nickname}</span>
+                            {leave.reason && <span className="leave-reason">{leave.reason}</span>}
+                          </div>
+                        ))}
                       </div>
-                    ))}
-                  </div>
-                </div>
+                    </div>
+                  )}
+                  {lockedMembers.length > 0 && (
+                    <div className="locks-section">
+                      <h4>鎖卡名單</h4>
+                      <div className="locks-list-detail">
+                        {lockedMembers.map((member) => {
+                          const locks = getMemberLocksOnDate(member.member_id, dateStr)
+                          return (
+                            <div key={member.member_id} className="lock-tag">
+                              <span className="lock-name">{member.nickname}</span>
+                              {locks.map(lock => (
+                                <span key={lock.id} className="lock-reason">
+                                  {lock.reason ? `: ${lock.reason}` : '鎖卡中'}
+                                </span>
+                              ))}
+                            </div>
+                          )
+                        })}
+                      </div>
+                    </div>
+                  )}
+                </>
               )
             })()}
           </div>

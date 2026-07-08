@@ -105,6 +105,18 @@
   border: 2px solid white;
 }
 
+.nav-link-admin {
+  background: linear-gradient(135deg, #ff9800 0%, #f57c00 100%);
+  color: white;
+  font-weight: 700;
+}
+
+.nav-link-admin:hover {
+  background: linear-gradient(135deg, #f57c00 0%, #e65100 100%);
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(255, 152, 0, 0.4);
+}
+
 .nav-link-logout {
   cursor: pointer;
   background: rgba(239, 68, 68, 0.9);
