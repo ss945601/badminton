@@ -355,12 +355,65 @@
 }
 
 @media (max-width: 768px) {
+  .admin-page {
+    padding: 1rem;
+  }
+
   .admin-content {
     grid-template-columns: 1fr;
+    gap: 1rem;
+    min-height: auto;
+  }
+
+  .members-panel,
+  .details-panel {
+    padding: 1rem;
+    min-width: 0;
   }
 
   .members-panel {
-    max-height: 300px;
+    max-height: none;
+  }
+
+  .members-list-admin {
+    max-height: none;
+    overflow-y: visible;
+  }
+
+  .member-item {
+    padding: 0.875rem;
+    min-width: 0;
+    white-space: normal;
+  }
+
+  .member-item-info {
+    flex-wrap: wrap;
+    align-items: flex-start;
+    gap: 0.35rem;
+    margin-bottom: 0.35rem;
+  }
+
+  .member-name,
+  .member-id {
+    overflow-wrap: anywhere;
+    word-break: break-word;
+  }
+
+  .admin-badge {
+    flex-shrink: 0;
+  }
+
+  .section-header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.75rem;
+  }
+
+  .btn-toggle-admin,
+  .btn-add-lock,
+  .form-actions button,
+  .lock-actions button {
+    width: 100%;
   }
 
   .lock-item {
@@ -371,10 +424,17 @@
 
   .lock-actions {
     width: 100%;
+    flex-direction: column;
   }
 
   .btn-edit,
   .btn-delete {
     flex: 1;
+    width: 100%;
+  }
+
+  .form-group input,
+  .form-group textarea {
+    box-sizing: border-box;
   }
 }
