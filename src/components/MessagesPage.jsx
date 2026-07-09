@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { API_BASE_URL } from '../constants'
 import './MessagesPage.css'
 
@@ -15,9 +15,13 @@ function MessageItem({
   deletingId,
   isOwner,
   handleDeleteMessage,
+  replyPreview,
+  setReplyPreview,
+  handleReplyPaste,
 }) {
   const isParent = depth === 0
   const messageClass = isParent ? 'parent-message' : 'reply-message'
+  const [selectedImage, setSelectedImage] = useState(null)
 
   return (
     <div className="message-item">
@@ -54,8 +58,29 @@ function MessageItem({
             )}
           </div>
         </div>
-        <p className="message-content">{msg.content}</p>
+        {msg.content && typeof msg.content === 'string' && msg.content.startsWith('data:image/') ? (
+          <div className="message-content image-message">
+            <button
+              type="button"
+              className="image-thumbnail-btn"
+              onClick={() => setSelectedImage(msg.content)}
+            >
+              <img src={msg.content} alt="留言圖片" className="message-image" />
+            </button>
+          </div>
+        ) : (
+          <p className="message-content">{msg.content}</p>
+        )}
       </div>
+
+      {selectedImage && (
+        <div className="image-lightbox" onClick={() => setSelectedImage(null)} role="dialog" aria-modal="true">
+          <button type="button" className="image-lightbox-close" onClick={() => setSelectedImage(null)}>
+            ✕
+          </button>
+          <img src={selectedImage} alt="放大圖片" className="image-lightbox-image" />
+        </div>
+      )}
 
       <div className={`reply-form ${replyingTo === msg.id ? 'reply-form-open' : 'reply-form-hidden'}`}>
         {replyingTo === msg.id && (
@@ -69,10 +94,16 @@ function MessageItem({
             <textarea
               value={replyDraft}
               onChange={(event) => setReplyDraft(event.target.value)}
+              onPaste={handleReplyPaste}
               placeholder="輸入你的回覆..."
               required
               className="reply-input"
             />
+            {replyPreview && (
+              <div className="paste-preview">
+                <img src={replyPreview} alt="貼上圖片預覽" className="paste-preview-image" />
+              </div>
+            )}
             <button type="submit" className="submit-reply-btn">
               <span className="btn-icon">📤</span>
               送出回覆
@@ -98,6 +129,9 @@ function MessageItem({
               deletingId={deletingId}
               isOwner={isOwner}
               handleDeleteMessage={handleDeleteMessage}
+              replyPreview={replyPreview}
+              setReplyPreview={setReplyPreview}
+              handleReplyPaste={handleReplyPaste}
             />
           ))}
         </div>
@@ -113,6 +147,9 @@ export default function MessagesPage({ token, setStatus }) {
   const [deletingId, setDeletingId] = useState(null)
   const [replyingTo, setReplyingTo] = useState(null)
   const [replyDraft, setReplyDraft] = useState('')
+  const [pasteHint, setPasteHint] = useState('')
+  const [pastedImageBase64, setPastedImageBase64] = useState(null)
+  const [replyPreview, setReplyPreview] = useState('')
 
   const isOwner = (messageItem) => {
     if (!token) {
@@ -155,10 +192,87 @@ export default function MessagesPage({ token, setStatus }) {
     setMessages(data)
   }
 
+  const readClipboardImageAsDataUrl = (file) => {
+    return new Promise((resolve, reject) => {
+      if (!file || typeof FileReader === 'undefined') {
+        reject(new Error('不支援讀取圖片'))
+        return
+      }
+
+      const reader = new FileReader()
+      reader.onload = () => resolve(reader.result)
+      reader.onerror = () => reject(new Error('圖片讀取失敗'))
+      reader.readAsDataURL(file)
+    })
+  }
+
+  const handlePaste = async (event) => {
+    const clipboardItems = event.clipboardData?.items || []
+    const imageItem = Array.from(clipboardItems).find((item) => item.type.startsWith('image/'))
+
+    if (!imageItem) {
+      return
+    }
+
+    event.preventDefault()
+    const file = imageItem?.getAsFile?.() || event.clipboardData?.files?.[0]
+
+    if (!file) {
+      setStatus('貼上圖片失敗，請重新複製圖片')
+      return
+    }
+
+    try {
+      const base64 = await readClipboardImageAsDataUrl(file)
+      setPastedImageBase64(base64)
+      setMessage((current) => {
+        const nextValue = current ? `${current}\n📷 圖片已貼上` : '📷 圖片已貼上'
+        return nextValue
+      })
+      setPasteHint('圖片已貼上，按送出留言即可存入')
+    } catch {
+      setStatus('貼上圖片失敗，請重新複製圖片')
+    }
+  }
+
+  const handleReplyPaste = async (event) => {
+    const clipboardItems = event.clipboardData?.items || []
+    const imageItem = Array.from(clipboardItems).find((item) => item.type.startsWith('image/'))
+
+    if (!imageItem) {
+      return
+    }
+
+    event.preventDefault()
+    const file = imageItem?.getAsFile?.() || event.clipboardData?.files?.[0]
+
+    if (!file) {
+      setStatus('貼上圖片失敗，請重新複製圖片')
+      return
+    }
+
+    try {
+      const base64 = await readClipboardImageAsDataUrl(file)
+      setReplyPreview(base64)
+      setReplyDraft((current) => (current ? `${current}\n📷 圖片已貼上` : '📷 圖片已貼上'))
+      setPasteHint('圖片已貼上，按送出回覆即可存入')
+    } catch {
+      setStatus('貼上圖片失敗，請重新複製圖片')
+    }
+  }
+
   const handleMessageSubmit = async (event) => {
     event.preventDefault()
     if (!token) {
       setStatus('請先登入後再留言')
+      return
+    }
+
+    const trimmedMessage = message.trim()
+    const contentToSend = pastedImageBase64 || trimmedMessage
+
+    if (!contentToSend) {
+      setStatus('請輸入留言內容或貼上圖片')
       return
     }
 
@@ -169,7 +283,7 @@ export default function MessagesPage({ token, setStatus }) {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ 
-        content: message,
+        content: contentToSend,
         parent_id: null
       }),
     })
@@ -181,6 +295,8 @@ export default function MessagesPage({ token, setStatus }) {
     }
 
     setMessage('')
+    setPasteHint('')
+    setPastedImageBase64(null)
     setStatus(result.message)
     await refreshMessages()
   }
@@ -193,8 +309,10 @@ export default function MessagesPage({ token, setStatus }) {
     }
 
     const replyContent = replyDraft.trim()
-    if (!replyContent) {
-      setStatus('請輸入回覆內容')
+    const contentToSend = replyPreview || replyContent
+
+    if (!contentToSend) {
+      setStatus('請輸入回覆內容或貼上圖片')
       return
     }
 
@@ -205,7 +323,7 @@ export default function MessagesPage({ token, setStatus }) {
         Authorization: `Bearer ${token}`,
       },
       body: JSON.stringify({ 
-        content: replyContent,
+        content: contentToSend,
         parent_id: parentId
       }),
     })
@@ -217,6 +335,7 @@ export default function MessagesPage({ token, setStatus }) {
     }
 
     setReplyDraft('')
+    setReplyPreview('')
     setReplyingTo(null)
     setStatus(result.message)
     await refreshMessages()
@@ -276,7 +395,7 @@ export default function MessagesPage({ token, setStatus }) {
     }))
   }
 
-  const organizedMessages = buildMessageTree(messages)
+  const organizedMessages = useMemo(() => buildMessageTree(messages), [messages])
 
   return (
     <div className="messages-page">
@@ -289,10 +408,17 @@ export default function MessagesPage({ token, setStatus }) {
         <textarea
           value={message}
           onChange={(event) => setMessage(event.target.value)}
+          onPaste={handlePaste}
           placeholder="留下你的羽球消息或想一起打球的時間..."
           required
           className="message-input"
         />
+        {pasteHint && <p className="paste-hint">📷 {pasteHint}</p>}
+        {pastedImageBase64 && (
+          <div className="paste-preview">
+            <img src={pastedImageBase64} alt="貼上圖片預覽" className="paste-preview-image" />
+          </div>
+        )}
         <button type="submit" className="submit-btn">
           <span className="btn-icon">📤</span>
           送出留言
@@ -323,6 +449,9 @@ export default function MessagesPage({ token, setStatus }) {
                 deletingId={deletingId}
                 isOwner={isOwner}
                 handleDeleteMessage={handleDeleteMessage}
+                replyPreview={replyPreview}
+                setReplyPreview={setReplyPreview}
+                handleReplyPaste={handleReplyPaste}
               />
             </div>
           ))
