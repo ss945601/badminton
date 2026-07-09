@@ -23,6 +23,29 @@ function MessageItem({
   const messageClass = isParent ? 'parent-message' : 'reply-message'
   const [selectedImage, setSelectedImage] = useState(null)
 
+  const extractImageFromContent = (content) => {
+    if (typeof content !== 'string') {
+      return null
+    }
+
+    const lines = content.split('\n').filter(Boolean)
+    const imageLine = lines.find((line) => line.startsWith('data:image/'))
+    return imageLine || null
+  }
+
+  const textContent = (() => {
+    if (typeof msg.content !== 'string') {
+      return ''
+    }
+
+    const lines = msg.content.split('\n').filter(Boolean)
+    const imageLines = lines.filter((line) => line.startsWith('data:image/'))
+    const filteredLines = lines.filter((line) => !imageLines.includes(line) && line !== '📷 圖片已貼上')
+    return filteredLines.join('\n')
+  })()
+
+  const imageContent = extractImageFromContent(msg.content)
+
   return (
     <div className="message-item">
       <div className={`message-card ${messageClass}`}>
@@ -58,18 +81,19 @@ function MessageItem({
             )}
           </div>
         </div>
-        {msg.content && typeof msg.content === 'string' && msg.content.startsWith('data:image/') ? (
+        {imageContent ? (
           <div className="message-content image-message">
+            {textContent && <div className="message-content">{textContent}</div>}
             <button
               type="button"
               className="image-thumbnail-btn"
-              onClick={() => setSelectedImage(msg.content)}
+              onClick={() => setSelectedImage(imageContent)}
             >
-              <img src={msg.content} alt="留言圖片" className="message-image" />
+              <img src={imageContent} alt="留言圖片" className="message-image" />
             </button>
           </div>
         ) : (
-          <p className="message-content">{msg.content}</p>
+          <div className="message-content">{msg.content}</div>
         )}
       </div>
 
@@ -101,7 +125,20 @@ function MessageItem({
             />
             {replyPreview && (
               <div className="paste-preview">
-                <img src={replyPreview} alt="貼上圖片預覽" className="paste-preview-image" />
+                <div className="paste-preview-wrapper">
+                  <button
+                    type="button"
+                    className="paste-preview-remove"
+                    onClick={() => {
+                      setReplyPreview('')
+                      setReplyDraft((current) => current.replace(/\n?📷 圖片已貼上/g, '').trim())
+                    }}
+                    aria-label="移除貼上圖片"
+                  >
+                    ✕
+                  </button>
+                  <img src={replyPreview} alt="貼上圖片預覽" className="paste-preview-image" />
+                </div>
               </div>
             )}
             <button type="submit" className="submit-reply-btn">
@@ -225,10 +262,7 @@ export default function MessagesPage({ token, setStatus }) {
     try {
       const base64 = await readClipboardImageAsDataUrl(file)
       setPastedImageBase64(base64)
-      setMessage((current) => {
-        const nextValue = current ? `${current}\n📷 圖片已貼上` : '📷 圖片已貼上'
-        return nextValue
-      })
+      setMessage((current) => current)
       setPasteHint('圖片已貼上，按送出留言即可存入')
     } catch {
       setStatus('貼上圖片失敗，請重新複製圖片')
@@ -254,7 +288,7 @@ export default function MessagesPage({ token, setStatus }) {
     try {
       const base64 = await readClipboardImageAsDataUrl(file)
       setReplyPreview(base64)
-      setReplyDraft((current) => (current ? `${current}\n📷 圖片已貼上` : '📷 圖片已貼上'))
+      setReplyDraft((current) => current)
       setPasteHint('圖片已貼上，按送出回覆即可存入')
     } catch {
       setStatus('貼上圖片失敗，請重新複製圖片')
@@ -269,7 +303,12 @@ export default function MessagesPage({ token, setStatus }) {
     }
 
     const trimmedMessage = message.trim()
-    const contentToSend = pastedImageBase64 || trimmedMessage
+    const hasImage = Boolean(pastedImageBase64)
+    const contentToSend = hasImage && trimmedMessage
+      ? `${trimmedMessage}\n${pastedImageBase64}`
+      : hasImage
+        ? pastedImageBase64
+        : trimmedMessage
 
     if (!contentToSend) {
       setStatus('請輸入留言內容或貼上圖片')
@@ -309,7 +348,12 @@ export default function MessagesPage({ token, setStatus }) {
     }
 
     const replyContent = replyDraft.trim()
-    const contentToSend = replyPreview || replyContent
+    const hasImage = Boolean(replyPreview)
+    const contentToSend = hasImage && replyContent
+      ? `${replyContent}\n${replyPreview}`
+      : hasImage
+        ? replyPreview
+        : replyContent
 
     if (!contentToSend) {
       setStatus('請輸入回覆內容或貼上圖片')
@@ -416,7 +460,21 @@ export default function MessagesPage({ token, setStatus }) {
         {pasteHint && <p className="paste-hint">📷 {pasteHint}</p>}
         {pastedImageBase64 && (
           <div className="paste-preview">
-            <img src={pastedImageBase64} alt="貼上圖片預覽" className="paste-preview-image" />
+            <div className="paste-preview-wrapper">
+              <button
+                type="button"
+                className="paste-preview-remove"
+                onClick={() => {
+                  setPastedImageBase64(null)
+                  setMessage((current) => current.replace(/\n?📷 圖片已貼上/g, '').trim())
+                  setPasteHint('')
+                }}
+                aria-label="移除貼上圖片"
+              >
+                ✕
+              </button>
+              <img src={pastedImageBase64} alt="貼上圖片預覽" className="paste-preview-image" />
+            </div>
           </div>
         )}
         <button type="submit" className="submit-btn">
