@@ -9,6 +9,7 @@ import MembersPage from './components/MembersPage'
 import MessagesPage from './components/MessagesPage'
 import ProfilePage from './components/ProfilePage'
 import AdminPage from './components/AdminPage'
+import ActivityAlbumPage from './components/ActivityAlbumPage'
 import { getStoredToken, clearStoredToken } from './utils/auth'
 import './App.css'
 
@@ -38,6 +39,7 @@ function App() {
           />
           <Route path="/members" element={<MembersPage />} />
           <Route path="/messages" element={<MessagesPage token={token} setStatus={setStatus} />} />
+          <Route path="/album" element={<ActivityAlbumPage />} />
           <Route
             path="/profile"
             element={<ProfilePage token={token} setStatus={setStatus} />}

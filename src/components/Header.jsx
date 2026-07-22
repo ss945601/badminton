@@ -54,6 +54,10 @@ export default function Header({ token, onLogout }) {
             <span className="nav-icon">💬</span>
             留言板
           </NavLink>
+          <NavLink to="/album" className="nav-link">
+            <span className="nav-icon">📸</span>
+            活動相簿
+          </NavLink>
           {!token ? (
             <>
               <NavLink to="/register" className="nav-link nav-link-primary">
