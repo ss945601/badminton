@@ -37,7 +37,7 @@ function App() {
             path="/login"
             element={<LoginPage token={token} setToken={setToken} setStatus={setStatus} />}
           />
-          <Route path="/members" element={<MembersPage />} />
+          <Route path="/members" element={<MembersPage token={token} />} />
           <Route path="/messages" element={<MessagesPage token={token} setStatus={setStatus} />} />
           <Route path="/album" element={<ActivityAlbumPage />} />
           <Route
