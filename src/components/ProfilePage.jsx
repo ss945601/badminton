@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
+import AIChatWidget from './AIChatWidget'
 import { API_BASE_URL, DAYS } from '../constants'
 import './ProfilePage.css'
 
@@ -499,6 +500,7 @@ export default function ProfilePage({ token, setStatus }) {
           </div>
         </div>
       </div>
+      <AIChatWidget token={token} />
     </div>
   )
 }

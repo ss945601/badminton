@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react'
+import AIChatWidget from './AIChatWidget'
 import { API_BASE_URL } from '../constants'
 import './MembersPage.css'
 
@@ -15,7 +16,7 @@ const getCurrentWeekStart = () => {
   return monday
 }
 
-export default function MembersPage() {
+export default function MembersPage({ token }) {
   const [members, setMembers] = useState([])
   const [loading, setLoading] = useState(true)
   const [activeDay, setActiveDay] = useState(null)
@@ -339,6 +340,7 @@ export default function MembersPage() {
           ))}
         </div>
       </div>
+      <AIChatWidget token={token} />
     </div>
   )
 }
