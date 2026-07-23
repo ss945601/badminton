@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
+import aiRobotImage from '../assets/ai-robot.png'
 import { API_BASE_URL } from '../constants'
 import './HomePage.css'
 
@@ -108,7 +109,7 @@ export default function AIChatWidget({ token, initialNickname = DEFAULT_NICKNAME
         onClick={() => setIsChatOpen((open) => !open)}
         aria-label={isChatOpen ? '關閉 AI 助手' : '開啟 AI 助手'}
       >
-        <img src="/src/assets/ai-robot.png" alt="AI 助手" className="ai-assistant-icon" />
+        <img src={aiRobotImage} alt="AI 助手" className="ai-assistant-icon" />
       </button>
 
       {isChatOpen && (
